@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diseño de Muro de Contención en Voladizo + Sismo</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #1f2937; --muted: #6b7280;
+    --accent: #2563eb; --ok: #15803d; --bad: #b91c1c; --border: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+  header { background: var(--ink); color:#fff; padding: 18px 24px; }
+  header h1 { margin:0; font-size: 1.3rem; }
+  header p { margin: 4px 0 0; color:#cbd5e1; font-size:.85rem; }
+  .layout { display:flex; max-width:1500px; margin:0 auto; align-items:flex-start; }
+  form.sidebar { width: 360px; flex-shrink:0; background:var(--panel); padding:16px; border-right:1px solid var(--border); min-height:100vh; }
+  .content { flex:1; padding: 20px 24px; }
+  fieldset { border:1px solid var(--border); border-radius:8px; margin-bottom:12px; padding:10px 12px; }
+  legend { font-weight:600; font-size:.85rem; padding:0 6px; }
+  .field { margin-bottom:8px; }
+  .field label { display:block; font-size:.78rem; color:var(--muted); margin-bottom:2px; }
+  .field input[type=number], .field select { width:100%; padding:5px 6px; border:1px solid var(--border); border-radius:5px; font-size:.85rem; }
+  .field.checkbox { display:flex; align-items:center; gap:6px; }
+  .field.checkbox label { margin:0; font-size:.8rem; color: var(--ink); }
+  button.submit { width:100%; background:var(--accent); color:#fff; border:none; padding:10px; border-radius:8px; font-size:.95rem; cursor:pointer; margin-top:6px; }
+  button.submit:hover { background:#1d4ed8; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px 18px; margin-bottom:18px; }
+  .card h2 { margin-top:0; font-size:1.05rem; border-bottom:1px solid var(--border); padding-bottom:8px;}
+  .card h3 { font-size:.95rem; color:var(--accent); margin-bottom:6px;}
+  table { width:100%; border-collapse: collapse; margin: 8px 0 16px; font-size:.85rem; }
+  th, td { border:1px solid var(--border); padding:6px 8px; text-align:left; }
+  th { background:#f1f5f9; }
+  .metrics { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:18px;}
+  .metric { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:10px 16px; min-width:150px;}
+  .metric .label { font-size:.72rem; color:var(--muted); }
+  .metric .value { font-size:1.25rem; font-weight:700; }
+  .ok { color: var(--ok); font-weight:600; }
+  .bad { color: var(--bad); font-weight:600; }
+  details summary { cursor:pointer; font-weight:600; padding:4px 0; }
+  .note { font-size:.8rem; color:var(--muted); background:#fffbeb; border:1px solid #fde68a; padding:10px 12px; border-radius:8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧱 Diseño de Muro de Contención en Voladizo + Sismo</h1>
+  <p>Réplica en Python/Flask de la lógica del Excel "Libro1.xlsx" — Ajusta los datos a la izquierda y presiona Calcular</p>
+</header>
+
+<div class="layout">
+  <form class="sidebar" method="POST" action="/">
+    {% for group_name, fields in field_groups %}
+    <fieldset>
+      <legend>{{ group_name }}</legend>
+      {% for f in fields %}
+        <div class="field {{ 'checkbox' if f.type == 'checkbox' else '' }}">
+          {% if f.type == 'checkbox' %}
+            <input type="checkbox" id="{{ f.key }}" name="{{ f.key }}" {% if current_value(inp, f.key) %}checked{% endif %}>
+            <label for="{{ f.key }}">{{ f.label }}</label>
+          {% elif f.type == 'select' %}
+            <label for="{{ f.key }}">{{ f.label }}</label>
+            <select id="{{ f.key }}" name="{{ f.key }}">
+              {% for opt in f.options %}
+                <option value="{{ opt }}" {% if current_value(inp, f.key) == opt %}selected{% endif %}>
+                  {{ f.option_labels[opt] if f.option_labels is defined and opt in f.option_labels else opt }}
+                </option>
+              {% endfor %}
+            </select>
+          {% else %}
+            <label for="{{ f.key }}">{{ f.label }}</label>
+            <input type="number" step="{{ f.step }}" id="{{ f.key }}" name="{{ f.key }}" value="{{ current_value(inp, f.key) }}">
+          {% endif %}
+        </div>
+      {% endfor %}
+    </fieldset>
+    {% endfor %}
+    <button class="submit" type="submit">🔄 Calcular</button>
+  </form>
+
+  <div class="content">
+
+    <div class="metrics">
+      <div class="metric"><div class="label">B (ancho base zapata)</div><div class="value">{{ res.II.B|fmt(2) }} m</div></div>
+      <div class="metric"><div class="label">H (altura total)</div><div class="value">{{ res.I.H|fmt(2) }} m</div></div>
+      <div class="metric"><div class="label">Estado general</div>
+        <div class="value {{ 'ok' if all_ok else 'bad' }}">{{ '✅ CUMPLE' if all_ok else '⚠️ REVISAR' }}</div></div>
+    </div>
+
+    <div class="card">
+      <h2>I–II. Datos de entrada y Predimensionamiento</h2>
+      <table>
+        <tr><th>β1</th><td>{{ res.I.beta1|fmt(4) }}</td>
+            <th>δ (relleno)</th><td>{{ res.I.delta|fmt(2) }}°</td>
+            <th>δ2 (fundación)</th><td>{{ res.I.delta2|fmt(2) }}°</td></tr>
+        <tr><th>μ (fricción base)</th><td>{{ res.I.mu|fmt(4) }}</td>
+            <th>Kh</th><td>{{ res.I.Kh|fmt(3) }}</td>
+            <th>Kv</th><td>{{ res.I.Kv|fmt(3) }}</td></tr>
+        <tr><th>θ' (°)</th><td>{{ res.I.theta|fmt(2) }}</td>
+            <th>Hp (altura pantalla)</th><td>{{ res.II.Hp|fmt(3) }} m</td>
+            <th>b2 (talón)</th><td>{{ res.II.b2|fmt(3) }} m</td></tr>
+        <tr><th>S real (talud pantalla)</th><td>{{ (res.II.Sreal*100)|fmt(2) }}%</td>
+            <th>β2 (°)</th><td>{{ res.II.beta2|fmt(2) }}</td><th></th><td></td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>III. Coeficientes de Empuje</h2>
+      <table>
+        <tr><th>Coeficiente</th><th>Método</th><th>Valor</th></tr>
+        <tr><td>Ka (activo estático)</td><td>{{ res.III.metodo_activo }}</td><td>{{ res.III.Ka|fmt(5) }}</td></tr>
+        <tr><td>Kp (pasivo estático)</td><td>{{ res.III.metodo_pasivo }}</td><td>{{ res.III.Kp|fmt(5) }}</td></tr>
+        <tr><td>Kae (activo dinámico)</td><td>Mononobe-Okabe</td><td>{{ res.III.Kae|fmt(5) }}</td></tr>
+        <tr><td>Kpe (pasivo dinámico)</td><td>Mononobe-Okabe</td><td>{{ res.III.Kpe|fmt(5) }}</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>IV. Fuerzas y momentos — base de pantalla (t2)</h2>
+      <table>
+        <tr><th>Fuerza</th><th>P (Ton)</th><th>Brazo (m)</th><th>Momento (Ton-m)</th><th>Sentido</th></tr>
+        {% for nombre, p, q, mom, sentido in res.IV.fuerzas %}
+        <tr><td>{{ nombre }}</td><td>{{ p|fmt(4) }}</td><td>{{ q|fmt(4) }}</td><td>{{ mom|fmt(4) }}</td><td>{{ sentido }}</td></tr>
+        {% endfor %}
+      </table>
+      <div class="metrics">
+        <div class="metric"><div class="label">∑Vd (Ton)</div><div class="value">{{ res.IV.sum_Vd|fmt(3) }}</div></div>
+        <div class="metric"><div class="label">Mu (Ton-m)</div><div class="value">{{ res.IV.Mu|fmt(3) }}</div></div>
+        <div class="metric"><div class="label">Vdu (Ton)</div><div class="value">{{ res.IV.Vdu|fmt(3) }}</div></div>
+      </div>
+
+      <h3>V. Fuerzas verticales (estabilizantes) — Momento respecto a C</h3>
+      <table>
+        <tr><th>Elemento</th><th>Peso/Fuerza (Ton)</th><th>Brazo (m)</th><th>Momento (Ton-m)</th></tr>
+        {% for nombre, p, brazo, mom in res.V.pesos %}
+        <tr><td>{{ nombre }}</td><td>{{ p|fmt(4) }}</td><td>{{ brazo|fmt(4) }}</td><td>{{ mom|fmt(4) }}</td></tr>
+        {% endfor %}
+      </table>
+
+      <h3>V.2 Fuerzas horizontales (desestabilizantes)</h3>
+      <table>
+        <tr><th>Eah</th><td>{{ res.V.Eah|fmt(4) }}</td>
+            <th>Ep (pasivo)</th><td>{{ res.V.Ep|fmt(4) }}</td>
+            <th>Fsc</th><td>{{ res.V.Fsc|fmt(4) }}</td></tr>
+        <tr><th>EAE</th><td>{{ res.V.EAE|fmt(4) }}</td>
+            <th>∆AE</th><td>{{ res.V.dAE|fmt(4) }}</td>
+            <th>Pw1/Pw2/Pw3</th><td>{{ res.V.Pw1|fmt(3) }} / {{ res.V.Pw2|fmt(3) }} / {{ res.V.Pw3|fmt(3) }}</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>VI. Verificación por Volteo (FS = ∑Me / ∑Mv &gt; FSV)</h2>
+      <table>
+        <tr><th>Estado</th><th>∑Me (Ton-m)</th><th>∑Mv (Ton-m)</th><th>FS</th><th>FSV req.</th><th>Verificación</th></tr>
+        {% for est in estados %}
+          {% set v = res.VI[est] %}
+          <tr>
+            <td>{{ est }}</td>
+            {% if v %}
+            <td>{{ v.Me|fmt(3) }}</td><td>{{ v.Mv|fmt(3) }}</td><td>{{ v.FS|fmt(3) }}</td><td>{{ v.FSV|fmt(2) }}</td>
+            <td class="{{ 'ok' if v.ok else 'bad' }}">{{ v.ok|badge }}</td>
+            {% else %}
+            <td colspan="5">—</td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>VII. Verificación por Deslizamiento (FS = ∑Fr / ∑Ph &gt; FSD)</h2>
+      <p>c'a (adherencia) = {{ res.VII.ca|fmt(4) }} kg/cm2</p>
+      <table>
+        <tr><th>Estado</th><th>∑Fr (Ton)</th><th>∑Ph (Ton)</th><th>FS</th><th>FSD req.</th><th>Verificación</th></tr>
+        {% for est in estados %}
+          {% set v = res.VII.estados[est] %}
+          <tr>
+            <td>{{ est }}</td>
+            {% if v %}
+            <td>{{ v.Fr|fmt(3) }}</td><td>{{ v.Ph|fmt(3) }}</td><td>{{ v.FS|fmt(3) }}</td><td>{{ v.FSD|fmt(2) }}</td>
+            <td class="{{ 'ok' if v.ok else 'bad' }}">{{ v.ok|badge }}</td>
+            {% else %}
+            <td colspan="5">—</td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>VIII. Verificación por Capacidad de Carga</h2>
+      <h3>8.1 / 8.2 Posición de la resultante y excentricidad</h3>
+      <table>
+        <tr><th>Estado</th><th>Xo (m)</th><th>B/3 &lt; Xo &lt; 2B/3</th><th>e (m)</th><th>e &lt; B/6</th></tr>
+        {% for est in estados %}
+          {% set v = res.VIII[est] %}
+          <tr>
+            <td>{{ est }}</td>
+            {% if v %}
+            <td>{{ v.Xo|fmt(3) }}</td><td class="{{ 'ok' if v.ok_resultante else 'bad' }}">{{ v.ok_resultante|badge }}</td>
+            <td>{{ v.e|fmt(3) }}</td><td class="{{ 'ok' if v.ok_exc else 'bad' }}">{{ v.ok_exc|badge }}</td>
+            {% else %}
+            <td colspan="4">—</td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+      </table>
+      <h3>8.3 Presión actuante</h3>
+      <table>
+        <tr><th>Estado</th><th>q1 (Ton/m2)</th><th>q2 (Ton/m2)</th><th>σu adm (Ton/m2)</th><th>q1,2 &lt; σu</th></tr>
+        {% for est in estados %}
+          {% set v = res.VIII[est] %}
+          <tr>
+            <td>{{ est }}</td>
+            {% if v %}
+            <td>{{ v.q1|fmt(3) }}</td><td>{{ v.q2|fmt(3) }}</td><td>{{ v.sigma_adm|fmt(2) }}</td>
+            <td class="{{ 'ok' if v.ok_presion else 'bad' }}">{{ v.ok_presion|badge }}</td>
+            {% else %}
+            <td colspan="4">—</td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>IX. Diseño de Pantalla</h2>
+      <h3>9.1.1 Refuerzo vertical — Cara interior (contacto con el terreno)</h3>
+      <div class="metrics">
+        <div class="metric"><div class="label">Mu (Ton-m)</div><div class="value">{{ res.IX_interior.Mu|fmt(3) }}</div></div>
+        <div class="metric"><div class="label">d (cm)</div><div class="value">{{ res.IX_interior.d|fmt(2) }}</div></div>
+        <div class="metric"><div class="label">As diseño (cm²)</div><div class="value">{{ res.IX_interior.Asd|fmt(3) }}</div></div>
+      </div>
+      <p>Barra: <b>{{ res.IX_interior.barra }}</b> @ <b>{{ (res.IX_interior.S*100)|fmt(1) }} cm</b> →
+         As real = {{ res.IX_interior.Asr|fmt(3) }} cm² (As máx = {{ res.IX_interior.Asmax|fmt(3) }} cm²) →
+         <span class="{{ 'ok' if res.IX_interior.ok else 'bad' }}">{{ res.IX_interior.ok|badge }}</span></p>
+
+      <h3>9.1.3 Refuerzo vertical — Cara exterior (montaje)</h3>
+      <p>Asm = {{ res.IX_exterior.Asm|fmt(3) }} cm² → As diseño = {{ res.IX_exterior.Asd|fmt(3) }} cm²<br>
+         Barra: <b>{{ res.IX_exterior.barra }}</b> @ <b>{{ (res.IX_exterior.S*100)|fmt(1) }} cm</b> →
+         As real = {{ res.IX_exterior.Asr|fmt(3) }} cm²</p>
+
+      <h3>9.2 Refuerzo horizontal de pantalla</h3>
+      <table>
+        <tr><th>Tercio</th><th>Ast req. total (cm²)</th><th>Cara externa (2/3)</th><th>Cara interna (1/3)</th></tr>
+        {% for nombre, d in res.IX_horizontal.items() %}
+        <tr>
+          <td>{{ nombre }}</td><td>{{ d.Ast|fmt(3) }}</td>
+          <td>{{ d.ext.barra }} @ {{ (d.ext.S*100)|fmt(1) }} cm → Asr={{ d.ext.Asr|fmt(3) }}</td>
+          <td>{{ d.interior.barra }} @ {{ (d.interior.S*100)|fmt(1) }} cm → Asr={{ d.interior.Asr|fmt(3) }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+
+      <h3>9.3 Verificación por cortante en base de pantalla (t2)</h3>
+      <table>
+        <tr><th>Vdu (Ton)</th><th>Vc (Ton)</th><th>Vce (Ton)</th><th>Vdu/Vce</th><th>Verificación</th></tr>
+        <tr>
+          <td>{{ res.IX_cortante.Vdu|fmt(3) }}</td><td>{{ res.IX_cortante.Vc|fmt(3) }}</td>
+          <td>{{ res.IX_cortante.Vce|fmt(3) }}</td><td>{{ res.IX_cortante.ratio|fmt(3) }}</td>
+          <td class="{{ 'ok' if res.IX_cortante.ok else 'bad' }}">{{ res.IX_cortante.ok|badge }}</td>
+        </tr>
+      </table>
+
+      <h3>9.4 Longitud de anclaje del gancho (Ldg)</h3>
+      <table>
+        <tr><th>Ldg base (cm)</th><th>Factor r</th><th>ldg final (cm)</th><th>hz disponible (cm)</th><th>Verificación</th></tr>
+        <tr>
+          <td>{{ res.IX_anclaje.Ldg|fmt(2) }}</td><td>{{ res.IX_anclaje.factor_r|fmt(3) }}</td>
+          <td>{{ res.IX_anclaje.ldg_final|fmt(2) }}</td><td>{{ res.IX_anclaje.hz_cm|fmt(1) }}</td>
+          <td class="{{ 'ok' if res.IX_anclaje.ok else 'bad' }}">{{ res.IX_anclaje.ok|badge }}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>X. Diseño de Zapata Base</h2>
+      <h3>10.1 Puntera</h3>
+      <div class="metrics">
+        <div class="metric"><div class="label">qa (Ton/m²)</div><div class="value">{{ res.X_puntera.qa|fmt(3) }}</div></div>
+        <div class="metric"><div class="label">qb (Ton/m²)</div><div class="value">{{ res.X_puntera.qb|fmt(3) }}</div></div>
+      </div>
+      <table>
+        <tr><th></th><th>Vdu (Ton)</th><th>Vc (Ton)</th><th>Vce (Ton)</th><th>Verificación cortante</th></tr>
+        <tr><td>Puntera</td><td>{{ res.X_puntera.Vdu|fmt(3) }}</td><td>{{ res.X_puntera.Vc|fmt(3) }}</td>
+          <td>{{ res.X_puntera.Vce|fmt(3) }}</td>
+          <td class="{{ 'ok' if res.X_puntera.ok_cortante else 'bad' }}">{{ res.X_puntera.ok_cortante|badge }}</td></tr>
+      </table>
+      <p>Mua = {{ res.X_puntera.Mua|fmt(3) }} Ton-m, d = {{ res.X_puntera.d|fmt(2) }} cm, Asd = {{ res.X_puntera.Asd|fmt(3) }} cm²<br>
+      Barra: <b>{{ res.X_puntera.barra }}</b> @ <b>{{ (res.X_puntera.S*100)|fmt(1) }} cm</b> →
+      Asr = {{ res.X_puntera.Asr|fmt(3) }} cm² (Asmáx = {{ res.X_puntera.Asmax|fmt(3) }} cm²) →
+      <span class="{{ 'ok' if res.X_puntera.ok_flexion else 'bad' }}">{{ res.X_puntera.ok_flexion|badge }}</span></p>
+
+      <h3>10.2 Talón</h3>
+      <table>
+        <tr><th></th><th>Vdu (Ton)</th><th>Vc (Ton)</th><th>Vce (Ton)</th><th>Verificación cortante</th></tr>
+        <tr><td>Talón</td><td>{{ res.X_talon.Vdu|fmt(3) }}</td><td>{{ res.X_talon.Vc|fmt(3) }}</td>
+          <td>{{ res.X_talon.Vce|fmt(3) }}</td>
+          <td class="{{ 'ok' if res.X_talon.ok_cortante else 'bad' }}">{{ res.X_talon.ok_cortante|badge }}</td></tr>
+      </table>
+      <p>Mua = {{ res.X_talon.Mua|fmt(3) }} Ton-m, d = {{ res.X_talon.d|fmt(2) }} cm, Asd = {{ res.X_talon.Asd|fmt(3) }} cm²<br>
+      Barra: <b>{{ res.X_talon.barra }}</b> @ <b>{{ (res.X_talon.S*100)|fmt(1) }} cm</b> →
+      Asr = {{ res.X_talon.Asr|fmt(3) }} cm² (Asmáx = {{ res.X_talon.Asmax|fmt(3) }} cm²) →
+      <span class="{{ 'ok' if res.X_talon.ok_flexion else 'bad' }}">{{ res.X_talon.ok_flexion|badge }}</span></p>
+
+      <h3>10.3 Refuerzo transversal (acero inferior y superior de zapata)</h3>
+      <p>Asd = {{ res.X_transversal.Asd|fmt(3) }} cm² → Barra: <b>{{ res.X_transversal.barra }}</b> @
+      <b>{{ (res.X_transversal.S*100)|fmt(1) }} cm</b> → Asr = {{ res.X_transversal.Asr|fmt(3) }} cm²</p>
+    </div>
+
+    <div class="card">
+      <h2>📋 Resumen Final</h2>
+      <table>
+        <tr><th>Elemento</th><th>Cortante</th><th>Flexión</th><th>Long. Anclaje</th></tr>
+        <tr><td>Muro Pantalla (Principal)</td>
+          <td class="{{ 'ok' if res.RESUMEN.pantalla_cortante else 'bad' }}">{{ res.RESUMEN.pantalla_cortante|badge }}</td>
+          <td class="{{ 'ok' if res.RESUMEN.pantalla_flexion else 'bad' }}">{{ res.RESUMEN.pantalla_flexion|badge }}</td>
+          <td class="{{ 'ok' if res.RESUMEN.pantalla_anclaje else 'bad' }}">{{ res.RESUMEN.pantalla_anclaje|badge }}</td></tr>
+        <tr><td>Zapata Puntera</td>
+          <td class="{{ 'ok' if res.RESUMEN.puntera_cortante else 'bad' }}">{{ res.RESUMEN.puntera_cortante|badge }}</td>
+          <td class="{{ 'ok' if res.RESUMEN.puntera_flexion else 'bad' }}">{{ res.RESUMEN.puntera_flexion|badge }}</td>
+          <td>—</td></tr>
+        <tr><td>Zapata Talón</td>
+          <td class="{{ 'ok' if res.RESUMEN.talon_cortante else 'bad' }}">{{ res.RESUMEN.talon_cortante|badge }}</td>
+          <td class="{{ 'ok' if res.RESUMEN.talon_flexion else 'bad' }}">{{ res.RESUMEN.talon_flexion|badge }}</td>
+          <td>—</td></tr>
+      </table>
+
+      <table>
+        <tr><th>Estado de Carga</th><th>Volteo</th><th>Deslizamiento</th><th>Resultante</th><th>Excentricidad</th><th>Presión</th></tr>
+        {% for est in estados %}
+          {% set vv = res.VI[est] %}{% set vd = res.VII.estados[est] %}{% set vc = res.VIII[est] %}
+          <tr>
+            <td>{{ est }}</td>
+            <td class="{{ 'ok' if vv and vv.ok else 'bad' }}">{{ (vv.ok if vv else None)|badge }}</td>
+            <td class="{{ 'ok' if vd and vd.ok else 'bad' }}">{{ (vd.ok if vd else None)|badge }}</td>
+            <td class="{{ 'ok' if vc and vc.ok_resultante else 'bad' }}">{{ (vc.ok_resultante if vc else None)|badge }}</td>
+            <td class="{{ 'ok' if vc and vc.ok_exc else 'bad' }}">{{ (vc.ok_exc if vc else None)|badge }}</td>
+            <td class="{{ 'ok' if vc and vc.ok_presion else 'bad' }}">{{ (vc.ok_presion if vc else None)|badge }}</td>
+          </tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    <p class="note">
+      ⚠️ Nota: la verificación 9.1.2 "Refuerzo con punto de corte" (escalonado del acero a distintas alturas) del
+      Excel original no está incluida en esta réplica; se calcula el refuerzo principal de diseño en la sección
+      crítica (base de la pantalla). Los aportes de la hoja externa vinculada en el Excel ([1]T2, geometría del
+      dentellón) se asumen en 0 salvo que ingreses ese valor manualmente en el campo "Aporte adicional fricción/Ep
+      dentellón" del panel izquierdo.
+    </p>
+  </div>
+</div>
+</body>
+</html>
