@@ -1,12 +1,12 @@
 {
   "builds": [
     {
-      "src": "api/index.py",
+      "src": "index.py",
       "use": "@vercel/python",
-      "config": { "includeFiles": ["templates/**", "static/**", "api/calc_core.py"] }
+      "config": { "includeFiles": ["calc_core.py", "index.html"] }
     }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "api/index.py" }
+    { "src": "/(.*)", "dest": "index.py" }
   ]
 }

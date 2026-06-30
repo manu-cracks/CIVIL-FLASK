@@ -10,8 +10,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from flask import Flask, render_template, request
 from calc_core import calcular, DEFAULT_INPUTS, REBAR_TABLE
 
-app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), '..', 'templates'),
-            static_folder=os.path.join(os.path.dirname(__file__), '..', 'static'))
+app = Flask(__name__, template_folder=os.path.dirname(__file__))
 
 
 @app.template_filter('fmt')
