@@ -1,6 +1,6 @@
 """
-App Flask (compatible con Vercel) — Diseño de Muro de Contención en Voladizo + Sismo
-Replica la lógica del archivo Excel "Libro1.xlsx"
+App Flask — Diseño de Muro de Contención en Voladizo + Sismo
+"
 """
 import os
 import sys

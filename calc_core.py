@@ -1,6 +1,5 @@
 """
 Núcleo de cálculo - Diseño de Muro de Contención en Voladizo + Sismo
-Replica la lógica y fórmulas del archivo Excel "Libro1.xlsx" (Hoja1)
 Unidades: Ton, m, kg, cm (se indica en cada sección)
 """
 import math
