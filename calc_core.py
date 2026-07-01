@@ -54,7 +54,7 @@ def calcular(inp):
     """
     inp: dict con todas las variables de entrada (ver DEFAULT_INPUTS).
     Devuelve un dict gigante 'r' con todos los resultados intermedios,
-    organizados por sección, replicando el Excel.
+    organizados por sección.
     """
     r = {}
     rad = math.radians
